@@ -36,6 +36,7 @@ type Channel struct {
 	OtherInfo         string  `json:"other_info"`
 	Tag               *string `json:"tag" gorm:"index"`
 	Setting           *string `json:"setting" gorm:"type:text"`
+	CreateUser        int     `json:"create_user" gorm:"default:1"`
 }
 
 func (channel *Channel) GetModels() []string {
@@ -102,6 +103,21 @@ func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool) ([]*Chan
 	return channels, err
 }
 
+func GetChannelByUserId(userId int, startIdx int, num int, selectAll bool, idSort bool) ([]*Channel, error) {
+	var channels []*Channel
+	var err error
+	order := "priority desc"
+	if idSort {
+		order = "id desc"
+	}
+	if selectAll {
+		err = DB.Where("create_user = ?", userId).Order(order).Find(&channels).Error
+	} else {
+		err = DB.Where("create_user = ?", userId).Order(order).Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
+	}
+	return channels, err
+}
+
 func GetChannelsByTag(tag string, idSort bool) ([]*Channel, error) {
 	var channels []*Channel
 	order := "priority desc"
@@ -156,6 +172,50 @@ func SearchChannels(keyword string, group string, model string, idSort bool) ([]
 	return channels, nil
 }
 
+func SearchUserShareChannels(keyword string, group string, model string, idSort bool, userId int) ([]*Channel, error) {
+	var channels []*Channel
+	modelsCol := "`models`"
+
+	// 如果是 PostgreSQL，使用双引号
+	if common.UsingPostgreSQL {
+		keyCol = `"key"`
+		modelsCol = `"models"`
+	}
+
+	order := "priority desc"
+	if idSort {
+		order = "id desc"
+	}
+
+	// 构造基础查询
+	baseQuery := DB.Model(&Channel{}).Omit(keyCol)
+
+	// 构造WHERE子句
+	var whereClause string
+	var args []interface{}
+	if group != "" && group != "null" {
+		var groupCondition string
+		if common.UsingMySQL {
+			groupCondition = `CONCAT(',', ` + groupCol + `, ',') LIKE ?`
+		} else {
+			// sqlite, PostgreSQL
+			groupCondition = `(',' || ` + groupCol + ` || ',') LIKE ?`
+		}
+		whereClause = "(id = ? OR name LIKE ? OR " + keyCol + " = ?) AND " + modelsCol + ` LIKE ? AND ` + groupCondition
+		args = append(args, common.String2Int(keyword), "%"+keyword+"%", keyword, "%"+model+"%", "%,"+group+",%")
+	} else {
+		whereClause = "(id = ? OR name LIKE ? OR " + keyCol + " = ?) AND " + modelsCol + " LIKE ?"
+		args = append(args, common.String2Int(keyword), "%"+keyword+"%", keyword, "%"+model+"%")
+	}
+
+	// 执行查询
+	err := baseQuery.Where("create_user = ?", userId).Where(whereClause, args...).Order(order).Find(&channels).Error
+	if err != nil {
+		return nil, err
+	}
+	return channels, nil
+}
+
 func GetChannelById(id int, selectAll bool) (*Channel, error) {
 	channel := Channel{Id: id}
 	var err error = nil
@@ -163,6 +223,17 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 		err = DB.First(&channel, "id = ?", id).Error
 	} else {
 		err = DB.Omit("key").First(&channel, "id = ?", id).Error
+	}
+	return &channel, err
+}
+
+func GetUserShareChannelById(id int, selectAll bool, userId int) (*Channel, error) {
+	channel := Channel{Id: id, CreateUser: userId}
+	var err error = nil
+	if selectAll {
+		err = DB.First(&channel, "id = ? and create_user = ?", id, userId).Error
+	} else {
+		err = DB.Omit("key").First(&channel, "id = ? and create_user = ?", id, userId).Error
 	}
 	return &channel, err
 }

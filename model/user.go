@@ -40,6 +40,7 @@ type User struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
+	LastCheckIn      int64          `json:"last_check_in" gorm:"type:bigint;default:0;column:last_check_in"` // 上次签到时间
 }
 
 func (user *User) ToBaseUser() *UserBase {

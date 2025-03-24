@@ -10,6 +10,7 @@ import {
   getSystemName,
   isAdmin,
   isMobile,
+  isSimpleAdmin,
   showError,
 } from '../helpers';
 import '../index.css';
@@ -66,6 +67,7 @@ const iconStyle = (itemKey, selectedKeys) => {
 const routerMap = {
   home: '/',
   channel: '/channel',
+  share: '/share',
   token: '/token',
   redemption: '/redemption',
   topup: '/topup',
@@ -99,7 +101,7 @@ const SiderBar = () => {
 
   // 预先计算所有可能的图标样式
   const allItemKeys = useMemo(() => {
-    const keys = ['home', 'channel', 'token', 'redemption', 'topup', 'user', 'log', 'midjourney',
+    const keys = ['home', 'channel','share', 'token', 'redemption', 'topup', 'user', 'log', 'midjourney',
                  'setting', 'about', 'chat', 'detail', 'pricing', 'task', 'playground', 'personal'];
     // 添加聊天项的keys
     for (let i = 0; i < chatItems.length; i++) {
@@ -183,6 +185,19 @@ const SiderBar = () => {
         itemKey: 'personal',
         to: '/personal',
         icon: <IconUser />,
+      },
+    ],
+    [t],
+  );
+
+  const simpleAdminItems = useMemo(
+    () => [
+      {
+        text: t('添加渠道'),
+        itemKey: 'share',
+        to: '/share',
+        icon: <IconLayers />,
+        className: isSimpleAdmin() ? '' : 'tableHiddle',
       },
     ],
     [t],
@@ -440,6 +455,27 @@ const SiderBar = () => {
             className={item.className}
           />
         ))}
+
+
+      {isSimpleAdmin() && (
+                <>
+                  {/* Divider */}
+                  <Divider style={dividerStyle} />
+
+                  {/* Admin Section */}
+                  {!isCollapsed && <Text style={groupLabelStyle}>{t('分享')}</Text>}
+                  {simpleAdminItems.map((item) => (
+                    <Nav.Item
+                      key={item.itemKey}
+                      itemKey={item.itemKey}
+                      text={item.text}
+                      icon={React.cloneElement(item.icon, { style: iconStyles[item.itemKey] })}
+                      className={item.className}
+                    />
+                  ))}
+                </>
+              )}
+
 
         {isAdmin() && (
           <>

@@ -14,6 +14,13 @@ export function isAdmin() {
   return user.role >= 10;
 }
 
+export function isSimpleAdmin() {
+  let user = localStorage.getItem('user');
+  if (!user) return false;
+  user = JSON.parse(user);
+  return user.role >= 2;
+}
+
 export function isRoot() {
   let user = localStorage.getItem('user');
   if (!user) return false;

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"one-api/constant"
 
@@ -1021,5 +1022,93 @@ func UpdateUserSetting(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "设置已更新",
+	})
+}
+
+// CheckIn handles the daily check-in functionality
+func CheckIn(c *gin.Context) {
+	userId := c.GetInt("id")
+	if userId == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "用户未登录",
+		})
+		return
+	}
+
+	user, err := model.GetUserById(userId, true)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// 获取当前日期（不包含时间）的时间戳
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+
+	// 检查用户是否已经在今天签到过
+	if user.LastCheckIn >= today {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "今日已签到，请明天再来",
+		})
+		return
+	}
+
+	// 签到奖励配额
+	checkInQuota := 10000 // 可以根据实际需求调整签到奖励
+
+	// 开始数据库事务
+	tx := model.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "数据库错误",
+		})
+		return
+	}
+
+	// 更新用户的最后签到时间
+	user.LastCheckIn = time.Now().Unix()
+	if err := tx.Save(user).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "签到失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "签到失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 使用 IncreaseUserQuota 方法增加用户配额
+	if err := model.IncreaseUserQuota(userId, checkInQuota, false); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "签到失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 记录签到日志
+	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("每日签到奖励 %s", common.LogQuota(checkInQuota)))
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "签到成功！",
+		"data": gin.H{
+			"quota":       checkInQuota,
+			"total_quota": user.Quota + checkInQuota,
+		},
 	})
 }

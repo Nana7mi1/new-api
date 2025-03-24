@@ -83,6 +83,9 @@ const PersonalSetting = () => {
         notificationEmail: ''
     });
     const [showWebhookDocs, setShowWebhookDocs] = useState(false);
+    // 添加签到状态
+    const [checkInLoading, setCheckInLoading] = useState(false);
+    const [canCheckIn, setCanCheckIn] = useState(true);
 
     useEffect(() => {
         let status = localStorage.getItem('status');
@@ -96,6 +99,7 @@ const PersonalSetting = () => {
         }
         getUserData().then((res) => {
             console.log(userState);
+            checkCanCheckIn();
         });
         loadModels().then();
         getAffLink().then();
@@ -126,7 +130,10 @@ const PersonalSetting = () => {
                 notificationEmail: settings.notification_email || ''
             });
         }
-    }, [userState?.user?.setting]);
+    if (userState?.user) {
+            checkCanCheckIn();
+        }
+    }, [userState?.user]);
 
     // Save models expanded state to localStorage whenever it changes
     useEffect(() => {
@@ -167,6 +174,45 @@ const PersonalSetting = () => {
             userDispatch({type: 'login', payload: data});
         } else {
             showError(message);
+        }
+    };
+
+    // 检查用户是否可以签到
+    const checkCanCheckIn = () => {
+        if (!userState?.user) return;
+
+        const lastCheckIn = userState.user.last_check_in;
+        if (!lastCheckIn) {
+            setCanCheckIn(true);
+            return;
+        }
+
+        // 获取当前日期（不含时间）的时间戳
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+
+        // 如果上次签到时间小于今天的开始时间，则可以签到
+        setCanCheckIn(lastCheckIn < today);
+    };
+
+    // 签到方法
+    const handleCheckIn = async () => {
+        setCheckInLoading(true);
+        try {
+            const res = await API.post('/api/user/checkin');
+            const { success, message, data } = res.data;
+
+            if (success) {
+                showSuccess(t('签到成功') + `! +${renderQuota(data.quota)}`);
+                // 更新用户数据
+                await getUserData();
+            } else {
+                showError(message || t('签到失败，请稍后再试'));
+            }
+        } catch (error) {
+            showError(t('签到请求失败，请稍后再试'));
+        } finally {
+            setCheckInLoading(false);
         }
     };
 
@@ -500,17 +546,29 @@ const PersonalSetting = () => {
 
                             }
                         >
-                            <Descriptions row>
-                                <Descriptions.Item itemKey={t('当前余额')}>
-                                    {renderQuota(userState?.user?.quota)}
-                                </Descriptions.Item>
-                                <Descriptions.Item itemKey={t('历史消耗')}>
-                                    {renderQuota(userState?.user?.used_quota)}
-                                </Descriptions.Item>
-                                <Descriptions.Item itemKey={t('请求次数')}>
-                                    {userState.user?.request_count}
-                                </Descriptions.Item>
-                            </Descriptions>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Descriptions row>
+                                    <Descriptions.Item itemKey={t('当前余额')}>
+                                        {renderQuota(userState?.user?.quota)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item itemKey={t('历史消耗')}>
+                                        {renderQuota(userState?.user?.used_quota)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item itemKey={t('请求次数')}>
+                                        {userState.user?.request_count}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                                <Button 
+                                    type="primary" 
+                                    theme="solid" 
+                                    onClick={handleCheckIn} 
+                                    loading={checkInLoading}
+                                    disabled={!canCheckIn}
+                                    style={{ marginLeft: 16 }}
+                                >
+                                    {canCheckIn ? t('每日签到') : t('今日已签到')}
+                                </Button>
+                            </div>
                         </Card>
                         <Card
                             style={{marginTop: 10}}

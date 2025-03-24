@@ -11,6 +11,8 @@ import EditUser from './pages/User/EditUser';
 import PasswordResetForm from './components/PasswordResetForm';
 import PasswordResetConfirm from './components/PasswordResetConfirm';
 import Channel from './pages/Channel';
+import Share from './pages/Share';
+import EditShareChannel from './pages/Share/EditShareChannel';
 import Token from './pages/Token';
 import EditChannel from './pages/Channel/EditChannel';
 import Redemption from './pages/Redemption';
@@ -65,6 +67,30 @@ function App() {
           element={
             <Suspense fallback={<Loading></Loading>} key={location.pathname}>
               <EditChannel />
+            </Suspense>
+          }
+        />
+        <Route
+          path='/share'
+          element={
+            <PrivateRoute>
+              <Share />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/share/edit/:id'
+          element={
+            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+              <EditShareChannel />
+            </Suspense>
+          }
+        />
+        <Route
+          path='/share/add'
+          element={
+            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+              <EditShareChannel />
             </Suspense>
           }
         />

@@ -88,6 +88,55 @@ func GetAllChannels(c *gin.Context) {
 	return
 }
 
+func GetUserShareChannels(c *gin.Context) {
+	p, _ := strconv.Atoi(c.Query("p"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	userId := c.GetInt("id")
+	if p < 0 {
+		p = 0
+	}
+	if pageSize < 0 {
+		pageSize = common.ItemsPerPage
+	}
+	channelData := make([]*model.Channel, 0)
+	idSort, _ := strconv.ParseBool(c.Query("id_sort"))
+	enableTagMode, _ := strconv.ParseBool(c.Query("tag_mode"))
+	if enableTagMode {
+		tags, err := model.GetPaginatedTags(p*pageSize, pageSize)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		for _, tag := range tags {
+			if tag != nil && *tag != "" {
+				tagChannel, err := model.GetChannelsByTag(*tag, idSort)
+				if err == nil {
+					channelData = append(channelData, tagChannel...)
+				}
+			}
+		}
+	} else {
+		channels, err := model.GetChannelByUserId(userId, p*pageSize, pageSize, false, idSort)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		channelData = channels
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channelData,
+	})
+	return
+}
+
 func FetchUpstreamModels(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -208,6 +257,51 @@ func SearchChannels(c *gin.Context) {
 	return
 }
 
+func SearchUserShareChannels(c *gin.Context) {
+	keyword := c.Query("keyword")
+	group := c.Query("group")
+	modelKeyword := c.Query("model")
+	idSort, _ := strconv.ParseBool(c.Query("id_sort"))
+	enableTagMode, _ := strconv.ParseBool(c.Query("tag_mode"))
+	userId := c.GetInt("id")
+
+	channelData := make([]*model.Channel, 0)
+	if enableTagMode {
+		tags, err := model.SearchTags(keyword, group, modelKeyword, idSort)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		for _, tag := range tags {
+			if tag != nil && *tag != "" {
+				tagChannel, err := model.GetChannelsByTag(*tag, idSort)
+				if err == nil {
+					channelData = append(channelData, tagChannel...)
+				}
+			}
+		}
+	} else {
+		channels, err := model.SearchUserShareChannels(keyword, group, modelKeyword, idSort, userId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		channelData = channels
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channelData,
+	})
+	return
+}
+
 func GetChannel(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -233,9 +327,36 @@ func GetChannel(c *gin.Context) {
 	return
 }
 
+func GetUserShareChannel(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	channel, err := model.GetUserShareChannelById(id, false, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channel,
+	})
+	return
+}
+
 func AddChannel(c *gin.Context) {
 	channel := model.Channel{}
 	err := c.ShouldBindJSON(&channel)
+	userId := c.GetInt("id")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -244,6 +365,7 @@ func AddChannel(c *gin.Context) {
 		return
 	}
 	channel.CreatedTime = common.GetTimestamp()
+	channel.CreateUser = userId
 	keys := strings.Split(channel.Key, "\n")
 	if channel.Type == common.ChannelTypeVertexAi {
 		if channel.Other == "" {

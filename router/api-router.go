@@ -58,6 +58,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/amount", controller.RequestAmount)
 				selfRoute.POST("/aff_transfer", controller.TransferAffQuota)
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
+				selfRoute.POST("/checkin", controller.CheckIn)
 			}
 
 			adminRoute := userRoute.Group("/")
@@ -104,6 +105,33 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/fetch_models", controller.FetchModels)
 			channelRoute.POST("/batch/tag", controller.BatchSetChannelTag)
 		}
+
+		simpleAdminRoute := apiRouter.Group("/share")
+		simpleAdminRoute.Use(middleware.SimpleAdminAuth())
+		{
+			simpleAdminRoute.GET("/", controller.GetUserShareChannels)
+			simpleAdminRoute.GET("/search", controller.SearchUserShareChannels)
+			simpleAdminRoute.GET("/models", controller.ChannelListModels)
+			simpleAdminRoute.GET("/models_enabled", controller.EnabledListModels)
+			simpleAdminRoute.GET("/:id", controller.GetUserShareChannel)
+			simpleAdminRoute.GET("/test", controller.TestAllChannels)
+			simpleAdminRoute.GET("/test/:id", controller.TestChannel)
+			simpleAdminRoute.GET("/update_balance", controller.UpdateAllChannelsBalance)
+			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateChannelBalance)
+			simpleAdminRoute.POST("/", controller.AddChannel)
+			simpleAdminRoute.PUT("/", controller.UpdateChannel)
+			simpleAdminRoute.DELETE("/disabled", controller.DeleteDisabledChannel)
+			simpleAdminRoute.POST("/tag/disabled", controller.DisableTagChannels)
+			simpleAdminRoute.POST("/tag/enabled", controller.EnableTagChannels)
+			simpleAdminRoute.PUT("/tag", controller.EditTagChannels)
+			simpleAdminRoute.DELETE("/:id", controller.DeleteChannel)
+			simpleAdminRoute.POST("/batch", controller.DeleteChannelBatch)
+			simpleAdminRoute.POST("/fix", controller.FixChannelsAbilities)
+			simpleAdminRoute.GET("/fetch_models/:id", controller.FetchUpstreamModels)
+			simpleAdminRoute.POST("/fetch_models", controller.FetchModels)
+			simpleAdminRoute.POST("/batch/tag", controller.BatchSetChannelTag)
+		}
+
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())
 		{
@@ -143,7 +171,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		}
 		groupRoute := apiRouter.Group("/group")
-		groupRoute.Use(middleware.AdminAuth())
+		groupRoute.Use(middleware.SimpleAdminAuth())
 		{
 			groupRoute.GET("/", controller.GetGroups)
 		}
