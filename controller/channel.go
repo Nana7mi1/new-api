@@ -88,55 +88,6 @@ func GetAllChannels(c *gin.Context) {
 	return
 }
 
-func GetUserShareChannels(c *gin.Context) {
-	p, _ := strconv.Atoi(c.Query("p"))
-	pageSize, _ := strconv.Atoi(c.Query("page_size"))
-	userId := c.GetInt("id")
-	if p < 0 {
-		p = 0
-	}
-	if pageSize < 0 {
-		pageSize = common.ItemsPerPage
-	}
-	channelData := make([]*model.Channel, 0)
-	idSort, _ := strconv.ParseBool(c.Query("id_sort"))
-	enableTagMode, _ := strconv.ParseBool(c.Query("tag_mode"))
-	if enableTagMode {
-		tags, err := model.GetPaginatedTags(p*pageSize, pageSize)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
-		for _, tag := range tags {
-			if tag != nil && *tag != "" {
-				tagChannel, err := model.GetChannelsByTag(*tag, idSort)
-				if err == nil {
-					channelData = append(channelData, tagChannel...)
-				}
-			}
-		}
-	} else {
-		channels, err := model.GetChannelByUserId(userId, p*pageSize, pageSize, false, idSort)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
-		channelData = channels
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    channelData,
-	})
-	return
-}
-
 func FetchUpstreamModels(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -428,6 +379,43 @@ func DeleteChannel(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	channel := model.Channel{Id: id}
 	err := channel.Delete()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+	return
+}
+
+func DeleteUserChannel(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+
+	channel, err := model.GetChannelById(id, false)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	if channel.CreateUser != userId {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "当前渠道不属于该用户创建，不能删除",
+		})
+		return
+	}
+
+	userChannel := model.Channel{Id: id}
+	err = userChannel.Delete()
+
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

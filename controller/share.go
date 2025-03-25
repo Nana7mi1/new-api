@@ -1,0 +1,148 @@
+package controller
+
+import (
+	"net/http"
+	"one-api/common"
+	"one-api/model"
+	"one-api/service"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+func GetUserShareChannels(c *gin.Context) {
+	p, _ := strconv.Atoi(c.Query("p"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	userId := c.GetInt("id")
+	if p < 0 {
+		p = 0
+	}
+	if pageSize < 0 {
+		pageSize = common.ItemsPerPage
+	}
+	channelData := make([]*model.Channel, 0)
+	idSort, _ := strconv.ParseBool(c.Query("id_sort"))
+	enableTagMode, _ := strconv.ParseBool(c.Query("tag_mode"))
+	if enableTagMode {
+		tags, err := model.GetPaginatedTags(p*pageSize, pageSize)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		for _, tag := range tags {
+			if tag != nil && *tag != "" {
+				tagChannel, err := model.GetChannelsByTag(*tag, idSort)
+				if err == nil {
+					channelData = append(channelData, tagChannel...)
+				}
+			}
+		}
+	} else {
+		channels, err := model.GetChannelByUserId(userId, p*pageSize, pageSize, false, idSort)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		channelData = channels
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channelData,
+	})
+	return
+}
+
+func TestUserChannel(c *gin.Context) {
+	channelId, err := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	channel, err := model.GetUserShareChannelById(channelId, true, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	testModel := c.Query("model")
+	tik := time.Now()
+	err, _ = testChannel(channel, testModel)
+	tok := time.Now()
+	milliseconds := tok.Sub(tik).Milliseconds()
+	go channel.UpdateResponseTime(milliseconds)
+	consumedTime := float64(milliseconds) / 1000.0
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+			"time":    consumedTime,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"time":    consumedTime,
+	})
+	return
+}
+
+func UpdateAllUserShareChannelsBalance(c *gin.Context) {
+	userId := c.GetInt("id")
+
+	// TODO: make it async
+	err := updateAllUserShareChannelsBalance(userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+	return
+}
+
+func updateAllUserShareChannelsBalance(userId int) error {
+	channels, err := model.GetChannelByUserId(userId, 0, 0, true, false)
+	if err != nil {
+		return err
+	}
+	for _, channel := range channels {
+		if channel.Status != common.ChannelStatusEnabled {
+			continue
+		}
+		// TODO: support Azure
+		//if channel.Type != common.ChannelTypeOpenAI && channel.Type != common.ChannelTypeCustom {
+		//	continue
+		//}
+		balance, err := updateChannelBalance(channel)
+		if err != nil {
+			continue
+		} else {
+			// err is nil & balance <= 0 means quota is used up
+			if balance <= 0 {
+				service.DisableChannel(channel.Id, channel.Name, "余额不足")
+			}
+		}
+		time.Sleep(common.RequestInterval)
+	}
+	return nil
+}

@@ -109,14 +109,14 @@ func SetApiRouter(router *gin.Engine) {
 		simpleAdminRoute := apiRouter.Group("/share")
 		simpleAdminRoute.Use(middleware.SimpleAdminAuth())
 		{
-			simpleAdminRoute.GET("/", controller.GetUserShareChannels)
-			simpleAdminRoute.GET("/search", controller.SearchUserShareChannels)
+			simpleAdminRoute.GET("/", controller.GetUserShareChannels)          // √
+			simpleAdminRoute.GET("/search", controller.SearchUserShareChannels) // √
 			simpleAdminRoute.GET("/models", controller.ChannelListModels)
 			simpleAdminRoute.GET("/models_enabled", controller.EnabledListModels)
-			simpleAdminRoute.GET("/:id", controller.GetUserShareChannel)
-			simpleAdminRoute.GET("/test", controller.TestAllChannels)
-			simpleAdminRoute.GET("/test/:id", controller.TestChannel)
-			simpleAdminRoute.GET("/update_balance", controller.UpdateAllChannelsBalance)
+			simpleAdminRoute.GET("/:id", controller.GetUserShareChannel)                          // √
+			simpleAdminRoute.GET("/test", controller.TestUserShareChannels)                       // √
+			simpleAdminRoute.GET("/test/:id", controller.TestUserChannel)                         // √
+			simpleAdminRoute.GET("/update_balance", controller.UpdateAllUserShareChannelsBalance) // √
 			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateChannelBalance)
 			simpleAdminRoute.POST("/", controller.AddChannel)
 			simpleAdminRoute.PUT("/", controller.UpdateChannel)
@@ -124,7 +124,7 @@ func SetApiRouter(router *gin.Engine) {
 			simpleAdminRoute.POST("/tag/disabled", controller.DisableTagChannels)
 			simpleAdminRoute.POST("/tag/enabled", controller.EnableTagChannels)
 			simpleAdminRoute.PUT("/tag", controller.EditTagChannels)
-			simpleAdminRoute.DELETE("/:id", controller.DeleteChannel)
+			simpleAdminRoute.DELETE("/:id", controller.DeleteUserChannel) // √
 			simpleAdminRoute.POST("/batch", controller.DeleteChannelBatch)
 			simpleAdminRoute.POST("/fix", controller.FixChannelsAbilities)
 			simpleAdminRoute.GET("/fetch_models/:id", controller.FetchUpstreamModels)
