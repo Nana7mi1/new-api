@@ -1,4 +1,4 @@
-name: Linux FreeBSD Release
+name: Linux Release
 permissions:
   contents: write
 
@@ -33,40 +33,14 @@ jobs:
       - name: Build Backend (amd64)
         run: |
           go mod download
-          go build -ldflags "-s -w -X 'one-api/common.Version=$(git describe --tags)' -extldflags '-static'" -o one-api
+          go build -ldflags "-s -w -X 'one-api/common.Version=$(git describe --tags)' " -o one-api
 
-      - name: Build Backend (arm64)
-        run: |
-          sudo apt-get update
-          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y gcc-aarch64-linux-gnu
-          CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X 'one-api/common.Version=$(git describe --tags)' -extldflags '-static'" -o one-api-arm64
-          
-      - name: Build Backend (freebsd)
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          release: 13.2
-          prepare: |
-            pkg install -y jq wget curl git gcc bash gawk gsed
-            wget https://dl.google.com/go/go1.23.4.freebsd-amd64.tar.gz && tar -C /usr/local -xzf go1.23.4.freebsd-amd64.tar.gz && rm go1.23.4.freebsd-amd64.tar.gz
-            ln -s /usr/local/go/bin/go /usr/local/bin/go
-          # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # echo '. $HOME/.cargo/env' >> ~/.bashrc
-          # . "$HOME/.cargo/env"
-          run: |
-            git config --global --add safe.directory /home/runner/work/new-api-freebsd/new-api-freebsd/new-api
-            cd new-api
-            go mod download
-            go build -ldflags "-s -w -X 'one-api/common.Version=$(git describe --tags)' -extldflags '-static'" -o new-api-freebsd
-          
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             one-api
-            one-api-arm64
-            new-api-freebsd
           draft: true
           generate_release_notes: true
         env:
