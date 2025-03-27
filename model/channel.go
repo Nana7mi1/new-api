@@ -505,6 +505,11 @@ func DeleteDisabledChannel() (int64, error) {
 	return result.RowsAffected, result.Error
 }
 
+func DeleteUserDisabledChannel(userId int) (int64, error) {
+	result := DB.Where("create_user = ?", userId).Where("status = ? or status = ? ", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
+	return result.RowsAffected, result.Error
+}
+
 func GetPaginatedTags(offset int, limit int) ([]*string, error) {
 	var tags []*string
 	err := DB.Model(&Channel{}).Select("DISTINCT tag").Where("tag != ''").Offset(offset).Limit(limit).Find(&tags).Error

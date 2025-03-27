@@ -146,3 +146,112 @@ func updateAllUserShareChannelsBalance(userId int) error {
 	}
 	return nil
 }
+
+func UpdateUserChannelBalance(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	channel, err := model.GetUserShareChannelById(id, true, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	balance, err := updateChannelBalance(channel)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"balance": balance,
+	})
+	return
+}
+
+func UpdateUserChannel(c *gin.Context) {
+	channel := model.Channel{}
+	err := c.ShouldBindJSON(&channel)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	userId := c.GetInt("id")
+
+	if channel.CreateUser != userId {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "当前渠道不属于该用户创建，不能更新",
+		})
+		return
+	}
+
+	if channel.Type == common.ChannelTypeVertexAi {
+		if channel.Other == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "部署地区不能为空",
+			})
+			return
+		} else {
+			if common.IsJsonStr(channel.Other) {
+				// must have default
+				regionMap := common.StrToMap(channel.Other)
+				if regionMap["default"] == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"success": false,
+						"message": "部署地区必须包含default字段",
+					})
+					return
+				}
+			}
+		}
+	}
+	err = channel.Update()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channel,
+	})
+	return
+}
+
+func DeleteUserDisabledChannel(c *gin.Context) {
+	userId := c.GetInt("id")
+	rows, err := model.DeleteUserDisabledChannel(userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    rows,
+	})
+	return
+}

@@ -109,18 +109,18 @@ func SetApiRouter(router *gin.Engine) {
 		simpleAdminRoute := apiRouter.Group("/share")
 		simpleAdminRoute.Use(middleware.SimpleAdminAuth())
 		{
-			simpleAdminRoute.GET("/", controller.GetUserShareChannels)          // √
-			simpleAdminRoute.GET("/search", controller.SearchUserShareChannels) // √
-			simpleAdminRoute.GET("/models", controller.ChannelListModels)
-			simpleAdminRoute.GET("/models_enabled", controller.EnabledListModels)
+			simpleAdminRoute.GET("/", controller.GetUserShareChannels)                            // √
+			simpleAdminRoute.GET("/search", controller.SearchUserShareChannels)                   // √
+			simpleAdminRoute.GET("/models", controller.ChannelListModels)                         // √
+			simpleAdminRoute.GET("/models_enabled", controller.EnabledListModels)                 // √
 			simpleAdminRoute.GET("/:id", controller.GetUserShareChannel)                          // √
 			simpleAdminRoute.GET("/test", controller.TestUserShareChannels)                       // √
 			simpleAdminRoute.GET("/test/:id", controller.TestUserChannel)                         // √
 			simpleAdminRoute.GET("/update_balance", controller.UpdateAllUserShareChannelsBalance) // √
-			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateChannelBalance)
-			simpleAdminRoute.POST("/", controller.AddChannel)
-			simpleAdminRoute.PUT("/", controller.UpdateChannel)
-			simpleAdminRoute.DELETE("/disabled", controller.DeleteDisabledChannel)
+			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateUserChannelBalance)
+			simpleAdminRoute.POST("/", controller.AddChannel)                          // √
+			simpleAdminRoute.PUT("/", controller.UpdateUserChannel)                    // √
+			simpleAdminRoute.DELETE("/disabled", controller.DeleteUserDisabledChannel) // √
 			simpleAdminRoute.POST("/tag/disabled", controller.DisableTagChannels)
 			simpleAdminRoute.POST("/tag/enabled", controller.EnableTagChannels)
 			simpleAdminRoute.PUT("/tag", controller.EditTagChannels)
