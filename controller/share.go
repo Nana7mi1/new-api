@@ -255,3 +255,143 @@ func DeleteUserDisabledChannel(c *gin.Context) {
 	})
 	return
 }
+
+func DisableUserShareTagChannels(c *gin.Context) {
+	channelTag := ChannelTag{}
+	err := c.ShouldBindJSON(&channelTag)
+	userId := c.GetInt("id")
+	if err != nil || channelTag.Tag == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+	err = model.DisableUserShareChannelByTag(channelTag.Tag, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+	return
+}
+
+func EnableUserShareTagChannels(c *gin.Context) {
+	channelTag := ChannelTag{}
+	err := c.ShouldBindJSON(&channelTag)
+	userId := c.GetInt("id")
+	if err != nil || channelTag.Tag == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+	err = model.EnableUserShareChannelByTag(channelTag.Tag, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+	return
+}
+
+func EditUserShareTagChannels(c *gin.Context) {
+	channelTag := ChannelTag{}
+	err := c.ShouldBindJSON(&channelTag)
+	userId := c.GetInt("id")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+	if channelTag.Tag == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "tag不能为空",
+		})
+		return
+	}
+	err = model.EditUserShareChannelByTag(channelTag.Tag, channelTag.NewTag, channelTag.ModelMapping, channelTag.Models, channelTag.Groups, channelTag.Priority, channelTag.Weight, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+	return
+}
+
+func DeleteUserShareChannelBatch(c *gin.Context) {
+	userId := c.GetInt("id")
+	channelBatch := ChannelBatch{}
+	err := c.ShouldBindJSON(&channelBatch)
+	if err != nil || len(channelBatch.Ids) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+
+	err = model.BatchDeleteUserShareChannels(channelBatch.Ids, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    len(channelBatch.Ids),
+	})
+	return
+}
+
+func BatchSetUserShareChannelTag(c *gin.Context) {
+	channelBatch := ChannelBatch{}
+	userId := c.GetInt("id")
+	err := c.ShouldBindJSON(&channelBatch)
+	if err != nil || len(channelBatch.Ids) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+	err = model.BatchSetUserShareChannelTag(channelBatch.Ids, channelBatch.Tag, userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    len(channelBatch.Ids),
+	})
+	return
+}

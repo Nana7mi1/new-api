@@ -117,19 +117,19 @@ func SetApiRouter(router *gin.Engine) {
 			simpleAdminRoute.GET("/test", controller.TestUserShareChannels)                       // √
 			simpleAdminRoute.GET("/test/:id", controller.TestUserChannel)                         // √
 			simpleAdminRoute.GET("/update_balance", controller.UpdateAllUserShareChannelsBalance) // √
-			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateUserChannelBalance)
-			simpleAdminRoute.POST("/", controller.AddChannel)                          // √
-			simpleAdminRoute.PUT("/", controller.UpdateUserChannel)                    // √
-			simpleAdminRoute.DELETE("/disabled", controller.DeleteUserDisabledChannel) // √
-			simpleAdminRoute.POST("/tag/disabled", controller.DisableTagChannels)
-			simpleAdminRoute.POST("/tag/enabled", controller.EnableTagChannels)
-			simpleAdminRoute.PUT("/tag", controller.EditTagChannels)
-			simpleAdminRoute.DELETE("/:id", controller.DeleteUserChannel) // √
-			simpleAdminRoute.POST("/batch", controller.DeleteChannelBatch)
+			simpleAdminRoute.GET("/update_balance/:id", controller.UpdateUserChannelBalance)      // √
+			simpleAdminRoute.POST("/", controller.AddChannel)                                     // √
+			simpleAdminRoute.PUT("/", controller.UpdateUserChannel)                               // √
+			simpleAdminRoute.DELETE("/disabled", controller.DeleteUserDisabledChannel)            // √
+			simpleAdminRoute.POST("/tag/disabled", controller.DisableUserShareTagChannels)        // √
+			simpleAdminRoute.POST("/tag/enabled", controller.EnableUserShareTagChannels)          // √
+			simpleAdminRoute.PUT("/tag", controller.EditUserShareTagChannels)                     // √
+			simpleAdminRoute.DELETE("/:id", controller.DeleteUserChannel)                         // √
+			simpleAdminRoute.POST("/batch", controller.DeleteUserShareChannelBatch)               // √
 			simpleAdminRoute.POST("/fix", controller.FixChannelsAbilities)
 			simpleAdminRoute.GET("/fetch_models/:id", controller.FetchUpstreamModels)
 			simpleAdminRoute.POST("/fetch_models", controller.FetchModels)
-			simpleAdminRoute.POST("/batch/tag", controller.BatchSetChannelTag)
+			simpleAdminRoute.POST("/batch/tag", controller.BatchSetUserShareChannelTag) // √
 		}
 
 		tokenRoute := apiRouter.Group("/token")

@@ -273,6 +273,38 @@ func BatchDeleteChannels(ids []int) error {
 	return err
 }
 
+func BatchDeleteUserShareChannels(ids []int, userId int) error {
+	var validChannelIDs []int
+	err := DB.Model(&Channel{}).
+		Where("id IN (?) AND create_user = ?", ids, userId).
+		Pluck("id", &validChannelIDs).Error
+	if err != nil {
+		return err
+	}
+
+	if len(validChannelIDs) == 0 {
+		return nil
+	}
+
+	//使用事务 删除channel表和channel_ability表
+	tx := DB.Begin()
+	err = tx.Where("id in (?) and create_user = ?", validChannelIDs, userId).Delete(&Channel{}).Error
+	if err != nil {
+		// 回滚事务
+		tx.Rollback()
+		return err
+	}
+	err = tx.Where("channel_id in (?)", validChannelIDs).Delete(&Ability{}).Error
+	if err != nil {
+		// 回滚事务
+		tx.Rollback()
+		return err
+	}
+	// 提交事务
+	tx.Commit()
+	return err
+}
+
 func (channel *Channel) GetPriority() int64 {
 	if channel.Priority == nil {
 		return 0
@@ -341,6 +373,29 @@ func (channel *Channel) UpdateResponseTime(responseTime int64) {
 
 func (channel *Channel) UpdateBalance(balance float64) {
 	err := DB.Model(channel).Select("balance_updated_time", "balance").Updates(Channel{
+		BalanceUpdatedTime: common.GetTimestamp(),
+		Balance:            balance,
+	}).Error
+	if err != nil {
+		common.SysError("failed to update balance: " + err.Error())
+	}
+}
+
+func (channel *Channel) UpdateBalanceAddQuota(balance float64, userId int) {
+	var balanceUpdatedTime int64
+	err := DB.Model(channel).Select("balance_updated_time").Where("id = ?", channel.Id).Pluck("balance_updated_time", &balanceUpdatedTime).Error
+	if err != nil {
+		common.SysError("failed to get balance_updated_time: " + err.Error())
+		return
+	}
+	// 检查 balance_updated_time 是否为 0
+	if balanceUpdatedTime == 0 { // 如果是 time.Time，可以用 balanceUpdatedTime.IsZero()
+		err := DB.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", balance*500000)).Error
+		if err != nil {
+			common.SysError("failed to update user quota: " + err.Error())
+		}
+	}
+	err = DB.Model(channel).Select("balance_updated_time", "balance").Updates(Channel{
 		BalanceUpdatedTime: common.GetTimestamp(),
 		Balance:            balance,
 	}).Error
@@ -421,12 +476,30 @@ func EnableChannelByTag(tag string) error {
 	return err
 }
 
+func EnableUserShareChannelByTag(tag string, userId int) error {
+	err := DB.Model(&Channel{}).Where("tag = ? and create_user = ?", tag, userId).Update("status", common.ChannelStatusEnabled).Error
+	if err != nil {
+		return err
+	}
+	err = UpdateUserShareAbilityStatusByTag(tag, true, userId)
+	return err
+}
+
 func DisableChannelByTag(tag string) error {
 	err := DB.Model(&Channel{}).Where("tag = ?", tag).Update("status", common.ChannelStatusManuallyDisabled).Error
 	if err != nil {
 		return err
 	}
 	err = UpdateAbilityStatusByTag(tag, false)
+	return err
+}
+
+func DisableUserShareChannelByTag(tag string, userId int) error {
+	err := DB.Model(&Channel{}).Where("tag = ? and create_user != ?", tag, userId).Update("status", common.ChannelStatusManuallyDisabled).Error
+	if err != nil {
+		return err
+	}
+	err = UpdateUserShareAbilityStatusByTag(tag, false, userId)
 	return err
 }
 
@@ -458,6 +531,56 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 	}
 
 	err := DB.Model(&Channel{}).Where("tag = ?", tag).Updates(updateData).Error
+	if err != nil {
+		return err
+	}
+	if shouldReCreateAbilities {
+		channels, err := GetChannelsByTag(updatedTag, false)
+		if err == nil {
+			for _, channel := range channels {
+				err = channel.UpdateAbilities(nil)
+				if err != nil {
+					common.SysError("failed to update abilities: " + err.Error())
+				}
+			}
+		}
+	} else {
+		err := UpdateAbilityByTag(tag, newTag, priority, weight)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func EditUserShareChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, userId int) error {
+	updateData := Channel{}
+	shouldReCreateAbilities := false
+	updatedTag := tag
+	// 如果 newTag 不为空且不等于 tag，则更新 tag
+	if newTag != nil && *newTag != tag {
+		updateData.Tag = newTag
+		updatedTag = *newTag
+	}
+	if modelMapping != nil && *modelMapping != "" {
+		updateData.ModelMapping = modelMapping
+	}
+	if models != nil && *models != "" {
+		shouldReCreateAbilities = true
+		updateData.Models = *models
+	}
+	if group != nil && *group != "" {
+		shouldReCreateAbilities = true
+		updateData.Group = *group
+	}
+	if priority != nil {
+		updateData.Priority = priority
+	}
+	if weight != nil {
+		updateData.Weight = weight
+	}
+
+	err := DB.Model(&Channel{}).Where("tag = ? and create_user = ?", tag, userId).Updates(updateData).Error
 	if err != nil {
 		return err
 	}
@@ -602,6 +725,39 @@ func BatchSetChannelTag(ids []int, tag *string) error {
 
 	// 更新标签
 	err := tx.Model(&Channel{}).Where("id in (?)", ids).Update("tag", tag).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// update ability status
+	channels, err := GetChannelsByIds(ids)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, channel := range channels {
+		err = channel.UpdateAbilities(tx)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// 提交事务
+	return tx.Commit().Error
+}
+
+func BatchSetUserShareChannelTag(ids []int, tag *string, userId int) error {
+	// 开启事务
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// 更新标签
+	err := tx.Model(&Channel{}).Where("id in (?) and create_user = ?", ids, userId).Update("tag", tag).Error
 	if err != nil {
 		tx.Rollback()
 		return err

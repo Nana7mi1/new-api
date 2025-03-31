@@ -238,6 +238,10 @@ func UpdateAbilityStatusByTag(tag string, status bool) error {
 	return DB.Model(&Ability{}).Where("tag = ?", tag).Select("enabled").Update("enabled", status).Error
 }
 
+func UpdateUserShareAbilityStatusByTag(tag string, status bool, userId int) error {
+	return DB.Model(&Ability{}).Where("tag = ? and create_user != ?", tag, userId).Select("enabled").Update("enabled", status).Error
+}
+
 func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uint) error {
 	ability := Ability{}
 	if newTag != nil {
@@ -297,4 +301,45 @@ func FixAbility() (int, error) {
 	}
 	InitChannelCache()
 	return count, nil
+}
+
+// GetRandomChannelByTag returns a random channel with the specified tag
+func GetRandomChannelByTag(group string, model string, tag string) (*Channel, error) {
+	var abilities []Ability
+
+	trueVal := "1"
+	if common.UsingPostgreSQL {
+		trueVal = "true"
+	}
+
+	err := DB.Where(groupCol+" = ? AND model = ? AND enabled = "+trueVal+" AND tag = ?",
+		group, model, tag).Order("weight DESC").Find(&abilities).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(abilities) == 0 {
+		return nil, errors.New("no channel found with the specified tag")
+	}
+
+	channel := Channel{}
+
+	// Randomly choose one based on weight
+	weightSum := uint(0)
+	for _, ability := range abilities {
+		weightSum += ability.Weight + 10
+	}
+
+	weight := common.GetRandomInt(int(weightSum))
+	for _, ability := range abilities {
+		weight -= int(ability.Weight) + 10
+		if weight <= 0 {
+			channel.Id = ability.ChannelId
+			break
+		}
+	}
+
+	err = DB.First(&channel, "id = ?", channel.Id).Error
+	return &channel, err
 }
